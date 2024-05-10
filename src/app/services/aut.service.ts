@@ -6,6 +6,8 @@ import { environment } from '@environments/environment';
 import { switchMap, tap } from 'rxjs/operators';
 import { ResponseLogin } from '@models/auth.model';
 import { User } from '@models/user.model';
+import { BehaviorSubject } from 'rxjs';
+import { checkToken } from '@interceptors/token.interceptor';
 
 @Injectable({
   providedIn: 'root'
@@ -13,8 +15,13 @@ import { User } from '@models/user.model';
 export class AutService {
 
   apiUrl = environment.API_URL;
+  user$ = new BehaviorSubject<User | null>(null);
 
   constructor( private http: HttpClient, private tokenSerive: TokenService) { }
+
+  getDataUser() {
+    return this.user$.getValue();
+  }
 
   login(email:string, password: string) {
     return this.http.post<ResponseLogin>(`${this.apiUrl}/api/v1/auth/login`, {
@@ -24,6 +31,17 @@ export class AutService {
     .pipe(
       tap(response => {
         this.tokenSerive.saveToken(response.access_token);
+        this.tokenSerive.saveRefreshToken(response.refresh_token);
+      })
+    );
+  }
+
+  refreshToken(refreshToken:string) {
+    return this.http.post<ResponseLogin>(`${this.apiUrl}/api/v1/auth/refresh-token`, { refreshToken })
+    .pipe(
+      tap(response => {
+        this.tokenSerive.saveToken(response.access_token);
+        this.tokenSerive.saveRefreshToken(response.refresh_token);
       })
     );
   }
@@ -56,12 +74,12 @@ export class AutService {
   }
 
   getProfile() {
-    const token = this.tokenSerive.getToken();
-    return this.http.get<User>(`${this.apiUrl}/api/v1/auth/profile`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-     });
+    //const token = this.tokenSerive.getToken();
+    return this.http.get<User>(`${this.apiUrl}/api/v1/auth/profile`, { context: checkToken()  }).pipe(
+      tap(user => {
+        this.user$.next(user);
+      })
+     );
   }
 
   logout() {

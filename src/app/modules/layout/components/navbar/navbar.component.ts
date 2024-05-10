@@ -6,15 +6,15 @@ import {
   faClose,
   faAngleDown
 } from '@fortawesome/free-solid-svg-icons';
-import { User } from '@models/user.model';
 
 import { AutService } from '@services/aut.service';
+import { TokenService } from '@services/token.service';
 
 @Component({
   selector: 'app-navbar',
   templateUrl: './navbar.component.html',
 })
-export class NavbarComponent implements OnInit {
+export class NavbarComponent {
   faBell = faBell;
   faInfoCircle = faInfoCircle;
   faClose = faClose;
@@ -23,21 +23,19 @@ export class NavbarComponent implements OnInit {
   isOpenOverlayAvatar = false;
   isOpenOverlayBoards = false;
 
-  user: User | null = null;
+  user$ = this.authService.user$;
 
   constructor(private authService : AutService,
-    private router: Router
+    private router: Router,
+    private tokenService: TokenService
   ) {}
-
-  ngOnInit() {
-    this.authService.getProfile()
-    .subscribe(user => {
-      this.user = user;
-    });
-  }
 
   logout() {
     this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  isValidToken() {
+    console.log(this.tokenService.isValidToken());
   }
 }
