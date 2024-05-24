@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import {
   CdkDragDrop,
   moveItemInArray,
@@ -12,6 +12,18 @@ import { BoardsService } from '@services/boards.service';
 import { ActivatedRoute } from '@angular/router';
 import { Board } from '@models/board.model';
 import { Card } from '@models/card.model';
+import { List } from '@models/list.model';
+import { FormBuilder, Validators, FormControl } from '@angular/forms';
+import {
+  faBell,
+  faAdd,
+  faInfoCircle,
+  faClose,
+  faAngleDown,
+  faL
+} from '@fortawesome/free-solid-svg-icons';
+import { ListsService } from '@services/List.service';
+import { BACKGROUNDS } from '@models/colors.model';
 
 @Component({
   selector: 'app-board',
@@ -27,9 +39,10 @@ import { Card } from '@models/card.model';
     `,
   ],
 })
-export class BoardComponent implements OnInit {
+export class BoardComponent implements OnInit, OnDestroy {
 
-
+  faClose = faClose;
+  faAdd = faAdd;
   board: Board | null = null;
 
   // columns: Column[] = [
@@ -70,11 +83,31 @@ export class BoardComponent implements OnInit {
   // doing: ToDo[] = [];
   // done: ToDo[] = [];
 
+  inputCard = new FormControl<string>('', {
+    nonNullable: true,
+    validators: [Validators.required]
+  });
+
+
+  inputList = new FormControl<string>('', {
+    nonNullable: true,
+    validators: [Validators.required]
+  });
+
+  showListForm = false;
+  colorBackgrounds = BACKGROUNDS;
+
   constructor(private dialog: Dialog,
     private route: ActivatedRoute,
     private boardsService: BoardsService,
-    private cardsService: CardService
+    private cardsService: CardService,
+    private formBuilder: FormBuilder,
+    private listsService: ListsService
   ) {}
+
+  ngOnDestroy(): void {
+    this.boardsService.setBackgroundColor('sky');
+  }
 
   ngOnInit() {
     this.route.paramMap.subscribe(params => {
@@ -106,11 +139,23 @@ export class BoardComponent implements OnInit {
     this.updateCard(card, position, listId);
   }
 
-  addColumn() {
-    // this.columns.push({
-    //   title: 'New Column',
-    //   todos: [],
-    // });
+  addList() {
+    const title = this.inputList.value;
+    if(this.board) {
+      this.listsService.create({
+        title,
+        boardId: this.board.id,
+        position: this.boardsService.getPositionNewItem(this.board.lists)
+      })
+      .subscribe(list => {
+        this.board?.lists.push({
+          ...list,
+          cards: []
+        });
+        this.showListForm = false;
+        this.inputList.setValue('');
+      })
+    }
   }
 
   openDialog(card: Card) {
@@ -131,6 +176,7 @@ export class BoardComponent implements OnInit {
     this.boardsService.getBoard(id)
     .subscribe(board => {
       this.board = board;
+      this.boardsService.setBackgroundColor(this.board.backgroundColor);
     });
   }
 
@@ -139,5 +185,50 @@ export class BoardComponent implements OnInit {
     .subscribe((cardUpdate) => {
       console.log(cardUpdate)
     });
+  }
+
+  openFormCard(list: List) {
+    if (this.board?.lists) {
+      this.board.lists = this.board.lists.map(iteratorList => {
+        if(iteratorList.id === list.id) {
+          return {
+            ...iteratorList,
+            showCartForm: true
+          }
+        }
+        return {
+          ...iteratorList,
+          showCartForm: false
+        }
+      });
+    }
+  }
+
+  createCard(list: List) {
+    const title = this.inputCard.value;
+    if (this.board) {
+      this.cardsService.create({
+        title,
+        listId: list.id,
+        boardId: this.board.id,
+        position: this.boardsService.getPositionNewItem(list.cards),
+      }).subscribe(card => {
+        list.cards.push(card);
+        this.inputCard.setValue('');
+        list.showCartForm = false;
+      })
+    }
+  }
+
+  closeCardForm(list: List) {
+    list.showCartForm = false;
+  }
+
+  get colors() {
+    if (this.board) {
+      const classes = this.colorBackgrounds[this.board.backgroundColor];
+      return classes ? classes : {};
+    }
+    return {}
   }
 }
